@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "FetchVolt Browser Link",
+  "version": "2.5.0",
+  "description": "Send public HTTPS downloads to FetchVolt using an allowlisted local native host.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3kax8y+MqTW/xwKudL1zSFDVnpo9yev2x8bQypvGJ/oapBiAEbhq2XfjhSs2nmMuzgaHGqvU/OqRLHkelJY3KEvH+jhZ65j5O3/OTNlSJ6P9/kVNfOXqQbCSFR7+0ie455xFWOt+8I3y5KliI/IWqakvcv05LqznhzW/Di3hgRIxUdgRoYco1XelZCwfHbCusASLAbNqrYRNmRrDRBsieHNScgFDttrQmxGPLGVi7PPL4M9GrXQ9Bq50sfQAOQuHq0ElLbkVj2C7E93+bHJAlhXhhIdOSHlog0u8CYn2sPhx1nJNWxAkRUFr8DzKomMBfTV6oOvrIgNPSzvUH2ih8QIDAQAB",
+  "permissions": [
+    "downloads",
+    "nativeMessaging",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_icon": "icon.png",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "128": "icon.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; connect-src 'none'"
+  }
+}

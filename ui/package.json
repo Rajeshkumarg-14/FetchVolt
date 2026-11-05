@@ -1,0 +1,19 @@
+{
+  "name": "net-booster-ui",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "@radix-ui/react-select": "2.4.1",
+    "lucide-react": "1.67.0",
+    "motion": "14.9.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "private": true
+}

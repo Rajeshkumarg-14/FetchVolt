@@ -1,0 +1,8 @@
+__pycache__/
+ui/node_modules/
+ui/dist/
+/*.exe
+.net-booster-*.part
+/*.iso
+.playwright-cli/
+releases/
