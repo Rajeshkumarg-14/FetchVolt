@@ -18,8 +18,8 @@ $legacyShortcuts = @(
 $registry = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NetBooster'
 $powerShell = Join-Path $PSHOME 'pwsh.exe'
 $payload = [ordered]@{
-    'FetchVolt.exe' = '1228414A68AF250A5A2741F441CF1670EEE0AE36DC15D9D076DA19B783F46BD8'
-    'Uninstall-NetBooster.ps1' = '6140192EAD8489BF3E4A7CA7037022217882AF70CE1A925053BAEC031508A9B2'
+    'FetchVolt.exe' = '6365139EF735CA1FD2A5C07C95E0A6D6C1AD29BA488B7EBFEA12C8218B114C65'
+    'Uninstall-NetBooster.ps1' = '6BC2BAD9429656423464856A88D37F08DAB7CEA500FC95B6912D0301765454CE'
 }
 
 function Assert-PlainPath([string]$Path) {
@@ -90,7 +90,36 @@ try {
         [IO.File]::Delete($file)
     }
 }
-Write-Host "FetchVolt installed in $install. Open it from the Start menu."
+$cli = Join-Path $install 'fetchvolt.cmd'
+Assert-PlainPath $cli
+$cliText = @'
+@rem FetchVolt managed terminal launcher
+@echo off
+"%~dp0Net Booster.exe" %*
+if not "%errorlevel%"=="42" exit /b %errorlevel%
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "$p=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs\Net Booster\.update-result.json';for($i=0;$i -lt 120;$i++){try{$r=Get-Content -LiteralPath $p -Raw|ConvertFrom-Json;if($r.state -ne 'pending'){Write-Host $r.message;exit [int]$r.exitCode}}catch{};Start-Sleep -Seconds 1};Write-Error 'Update result timed out; check the installation before retrying.';exit 1"
+exit /b %errorlevel%
+'@
+[IO.File]::WriteAllText($cli,$cliText.Replace("`n","`r`n"),[Text.ASCIIEncoding]::new())
+foreach($name in @('LICENSE','LICENSING.md','NOTICE.md')) {
+ $source=Join-Path $PSScriptRoot $name;$destination=Join-Path $install $name;Assert-PlainPath $destination
+ if(Test-Path -LiteralPath $source -PathType Leaf){[IO.File]::Copy($source,$destination,$true)}
+}
+$environmentKey=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Environment')
+try {
+ $raw=[string]$environmentKey.GetValue('Path','',[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+ $parts=@(); if($raw){$parts=@($raw -split ';')}
+ $kind=if($environmentKey.GetValueNames() -contains 'Path'){$environmentKey.GetValueKind('Path')}else{[Microsoft.Win32.RegistryValueKind]::ExpandString}
+ if($install -notin $parts){$environmentKey.SetValue('Path',(($parts+$install)-join ';'),$kind)}
+} finally {$environmentKey.Dispose()}
+$env:Path += ';'+$install
+$null=New-ItemProperty -LiteralPath $registry -Name CliPath -Value $install -PropertyType String -Force
+$null=New-ItemProperty -LiteralPath $registry -Name DisplayVersion -Value '2.6.0' -PropertyType String -Force
+Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class FetchVoltEnvironment { [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern IntPtr SendMessageTimeout(IntPtr h,uint m,UIntPtr w,string l,uint f,uint t,out UIntPtr r); }'
+[UIntPtr]$broadcastResult=[UIntPtr]::Zero
+$null=[FetchVoltEnvironment]::SendMessageTimeout([IntPtr]0xffff,0x1a,[UIntPtr]::Zero,'Environment',2,1000,[ref]$broadcastResult)
+Write-Host "FetchVolt installed in $install. Open a new terminal to use fetchvolt --help."
+
 $offerBrowser = $BrowserExtension.IsPresent
 if (!$offerBrowser -and !$SkipBrowserPrompt -and [Environment]::UserInteractive) {
     Add-Type -AssemblyName System.Windows.Forms

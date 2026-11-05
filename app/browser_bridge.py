@@ -16,6 +16,7 @@ import stat
 import struct
 import subprocess
 import sys
+from version import VERSION
 from runtime_paths import is_packaged, executable, resource_root
 import time
 from urllib.parse import urlsplit, unquote
@@ -229,7 +230,7 @@ def host(args):
             message = read_message(incoming)
             inbox = Inbox()
             if isinstance(message, dict) and message == {'op': 'ping'}:
-                response = {'ok': True, 'version': '2.5.0'}
+                response = {'ok': True, 'version': VERSION}
             elif isinstance(message, dict) and set(message) == {'op', 'id'} and message['op'] == 'status':
                 response = {'ok': True, 'state': inbox.status(message['id'])}
             else:

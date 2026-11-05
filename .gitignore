@@ -6,3 +6,7 @@ ui/dist/
 /*.iso
 .playwright-cli/
 releases/
+
+*.dpapi
+*.pfx
+*.key

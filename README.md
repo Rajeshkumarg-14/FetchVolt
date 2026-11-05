@@ -145,3 +145,24 @@ Copyright Â© 2026 Rajesh Kumar G. [GitHub](https://github.com/Rajeshkumarg-14) Â
 Network > Test your connection runs only when requested. Choose one connected IPv4 adapter. It samples three HTTPS response times and receives up to 10 MB (9.54 MiB) from Cloudflare, plus network overhead. Cloudflare receives the connection's public IP under its privacy policy. This does not run an upload test or measure combined-link capacity. A small sample can underestimate fast links; other traffic affects results. Active app downloads must be paused first. Cancellation interrupts an active response; connection/header work has bounded deadlines. Results and the five-entry successful-test history are session-only. No sample payload is written to disk, executed or published.
 
 The implementation uses Cloudflare's documented public download endpoint (https://github.com/cloudflare/speedtest), not its JavaScript engine or branding, and does not submit a separate result report. Provider endpoint availability may change.
+
+## Terminal commands and updates
+
+The 2.6 installer adds a managed `fetchvolt.cmd` launcher and the installation directory to your Windows user PATH. Open a new terminal after installation. No administrator PATH change is needed.
+
+```powershell
+fetchvolt --help
+fetchvolt --version
+fetchvolt connections
+fetchvolt update --check
+fetchvolt update --check --json
+fetchvolt update
+```
+
+Running `fetchvolt` without arguments opens the app. Native browser messaging and `--mcp-server` remain separate protocol modes. Unknown arguments fail without opening the GUI.
+
+`update --check` reads a bounded, publisher-signed manifest without downloading the setup bundle. `update` installs only a newer official release into the managed per-user installation. Close the GUI first, saving supported download progress normally. Updates preserve your settings, history and recovery files. The terminal launcher waits for the update worker's result. Portable copies and source checkouts must use the verified setup bundle instead of self-replacing.
+
+Update checks require HTTPS and an RSA-3072/SHA-256 publisher signature pinned in the app; hashes alone are not accepted as publisher authentication. Packages and every payload file are size-bounded and SHA-256 checked. Archives reject unexpected/duplicate paths and links. Microsoft Defender must scan extracted files successfully; they receive Mark of the Web. Windows execution policy and SmartScreen are not bypassed. The local PowerShell 7 worker rechecks the signed payload after the old process exits and restores originals if replacement fails before commit. Windows user-account access is a trust boundary; this is not protection against compromise of the same account or publisher key.
+
+Version 2.5 and earlier need one normal installer upgrade to obtain the terminal launcher. Future CLI updates need no uninstall/reinstall. The app remains an unsigned preview; the update-manifest signature is separate from Windows Authenticode signing. See docs/CLI-UPDATES.md for publishing and recovery.

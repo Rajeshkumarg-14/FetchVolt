@@ -21,6 +21,10 @@ if __name__ == '__main__' and '--browser-remove' in sys.argv:
     remove_registration()
     raise SystemExit(0)
 
+if __name__ == '__main__' and sys.argv[1:] and sys.argv[1:] != ['--startup']:
+    from cli import main as cli_main
+    raise SystemExit(cli_main(sys.argv[1:]))
+
 from datetime import datetime
 from pathlib import Path
 import os
@@ -37,6 +41,7 @@ import webview
 import appearance
 import windows_startup
 from speed_test import SpeedTest
+from version import VERSION
 from diagnostics import LOGGER, configure, failure
 from net_booster import MAX_CONNECTIONS, DownloadCancelled, DownloadStopped, LiveLinks, download, validate_url
 from network_monitor import History, changes, mbps, snapshot, storage_snapshot, traffic_snapshot
@@ -736,7 +741,7 @@ if __name__ == '__main__':
     except OSError:
         # A read-only or unavailable profile should not prevent the app opening.
         pass
-    LOGGER.info('session-started version=2.5.0')
+    LOGGER.info('session-started version=%s', VERSION)
     try:
         with browser_bridge.app_instance() as acquired:
             if acquired:

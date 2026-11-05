@@ -14,7 +14,7 @@ import sysconfig
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '2.5.0'
+VERSION = '2.6.0'
 RUNTIME_PACKAGES = (
     'Nuitka', 'pywebview', 'psutil', 'mcp', 'pythonnet', 'clr_loader', 'cffi', 'pycparser', 'bottle',
     'proxy_tools', 'typing_extensions', 'anyio', 'pydantic', 'pydantic_core', 'annotated_types',
@@ -102,6 +102,9 @@ def main():
     release = {'available': True, 'version': VERSION, 'sha256': checksum, 'bytes': target.stat().st_size,
                'url': f'https://github.com/Rajeshkumarg-14/fetchvolt-site/releases/download/v{VERSION}/{name}'}
     (folder / 'release.json').write_text(json.dumps(release, indent=2), 'utf-8')
+    signed_payload = {'format': 1, **release, 'files': {name: {'bytes': len(data), 'sha256': digest(data)} for name, data in files.items()}}
+    signed_payload.pop('available')
+    (folder / 'update-payload.json').write_text(json.dumps(signed_payload, separators=(',', ':')), encoding='utf-8')
     print(json.dumps({'zip': str(target), 'bytes': target.stat().st_size, 'sha256': checksum}))
 
 
