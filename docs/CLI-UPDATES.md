@@ -21,3 +21,23 @@ Successful staging folders are removed by the next update after path/link checks
 ## Verification scope
 
 Tests use independent ephemeral RSA keys; they do not require or export the production private key. Signed metadata tampering, untrusted keys, schema limits, ZIP traversal/duplicates/links, scan failures, downgrade prevention, headless dispatch and real Windows file replacement/rollback run in isolated fixtures. Hardware/download failure matrices remain simulations, not exhaustive security proof.
+
+## Deterministic boundary matrix
+
+`tests/python/test_update_matrix.py` adds 649 separately discoverable cases:
+
+| Area | Cases | Coverage |
+| --- | ---: | --- |
+| Valid versions | 125 | All triples from 0, 1, 9, 255 and 65535; checks exact parsed components |
+| Invalid versions | 96 | 32 malformed or out-of-range components in each of three positions |
+| Payload metadata | 288 | Every one of nine files against 10 invalid sizes, 14 invalid hashes and eight invalid entry shapes |
+| Successful bounded reads | 80 | Five payload sizes, four fragmentation sizes, memory/file output and present/absent Content-Length |
+| Interrupted or oversized reads | 60 | Five sizes and four fragment sizes against overflow, truncation and read timeout |
+
+Stream tests check exact returned bytes, transport deadlines/public-endpoint options, response and lease cleanup, and caller ownership of output streams. They use in-memory transport fixtures, not live adapters. Schema cases mock signature verification to isolate the signed-content validator. Actual RSA verification, ZIP validation and Windows worker apply/rollback remain covered by the separate focused updater tests. Neither matrix counts nor passing tests establish that the app cannot fail or has no security flaws.
+
+Run the added cases alone from the repository root:
+
+```powershell
+uv run --no-project --python 3.14 --with pywebview==6.2.1 --with psutil==7.2.2 --with mcp==2.3.0 python -m unittest tests.python.test_update_matrix -q
+```

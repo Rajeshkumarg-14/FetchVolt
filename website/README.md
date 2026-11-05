@@ -8,8 +8,10 @@ Publish the contents of this directory to the root of `Rajeshkumarg-14/fetchvolt
 
 Run locally: `python -m http.server 19196 --bind 127.0.0.1 --directory website` from the app repository root. Browser test at desktop and mobile widths; test tree toggles, Turbo, legal anchors, download link and checksum copy.
 
-Product typography: self-hosted Bricolage Grotesque and Manrope (SIL OFL, license files in assets). Design: native HTML/CSS, black surfaces with the existing mint/blue FetchVolt identity. Direction values: design variance 7, motion 5, density 4. Signature interaction: selectable network branches merge into one file; Turbo speeds the illustration, with a static reduced-motion alternative. The image is an actual app screenshot, not fabricated performance data.
+Product typography: self-hosted Bricolage Grotesque and Manrope (SIL OFL, license files in assets). Design: native HTML/CSS, black and silver surfaces with electric lime accents. Direction values: design variance 7, motion 5, density 4. Signature interaction: selectable network branches merge into one file; Turbo speeds the illustration, with a static reduced-motion alternative. The image is an actual app screenshot, not fabricated performance data.
 
 Contact is GitHub Issues at the owner's request. The owner selected unmodified PolyForm Noncommercial 1.0.0 on 5 November 2026, including its express organizational exceptions. Use source-available terminology and preserve the owner and third-party notices.
 
-FetchVolt redesign: black/silver and electric lime, approved by the owner. Self-hosted Bricolage Grotesque display and Manrope body fonts. The interactive network diagram is illustrative; no speed test or adapter access runs on the website. Local preview: `python -m http.server 18766 --bind 127.0.0.1 --directory website` from the private repository root.
+FetchVolt redesign: black/silver and electric lime, approved by the owner. Self-hosted Bricolage Grotesque display and Manrope body fonts. The interactive network diagram is illustrative; no speed test or adapter access runs on the website. Local preview: `python -m http.server 18766 --bind 127.0.0.1 --directory website` from the FetchVolt repository root.
+
+The Terminal navigation link opens the CLI guide. Check that its JSON example, PowerShell 7 requirement and published-release update explanation remain consistent with docs/CLI-UPDATES.md. Static documentation changes do not require a new setup artifact.
