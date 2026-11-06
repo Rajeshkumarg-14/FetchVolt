@@ -1,6 +1,6 @@
 #Requires -Version 7.0
 [CmdletBinding()]
-param([string]$OutputDirectory = 'P:\.cache\portflock-native-build')
+param([string]$OutputDirectory = 'P:\.cache\portflock-native-build', [switch]$CleanCache)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if (!(Test-Path P:\)) { throw 'The Dev Drive is not mounted.' }
@@ -16,6 +16,8 @@ try {
         $data += "--include-data-files=extension/${name}=extension/${name}"
     }
     $compiler = @('--zig')
+    # A stale object cache can link old compiled code into a new build; use -CleanCache when behavior does not match source.
+    if ($CleanCache) { $compiler += '--clean-cache=all' }
     uv run --no-project --python 3.14 --with Nuitka==4.3.4 --with pywebview==6.2.1 --with psutil==7.2.2 --with mcp==2.3.0 python -m nuitka `
         --mode=onefile @compiler --jobs=4 --lto=no --low-memory --enable-plugin=tk-inter --assume-yes-for-downloads `
         --include-package=mcp --include-module=browser_setup --include-distribution-metadata=mcp @data `

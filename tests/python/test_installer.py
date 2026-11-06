@@ -347,5 +347,46 @@ class ManageCommandTests(unittest.TestCase):
                 self.assertIn(message, err)
 
 
+class NoConsoleTests(unittest.TestCase):
+    """Windows Settings > Apps > Uninstall starts the exe with no console, so results must reach the user another way."""
+
+    def test_say_prints_when_a_terminal_exists(self):
+        out = io.StringIO()
+        with patch.object(cli.sys, 'stdout', out), patch('ctypes.windll', create=True) as windll:
+            cli.say('done')
+        self.assertEqual(out.getvalue(), 'done\n')
+        windll.user32.MessageBoxW.assert_not_called()
+
+    def test_say_shows_an_information_box_without_a_console(self):
+        with patch.object(cli.sys, 'stdout', None), patch.object(cli.sys, 'stderr', None), patch('ctypes.windll', create=True) as windll:
+            cli.say('FetchVolt was removed for this user.')
+        windll.user32.MessageBoxW.assert_called_once_with(None, 'FetchVolt was removed for this user.', 'FetchVolt', 0x40)
+
+    def test_say_shows_an_error_box_for_errors(self):
+        with patch.object(cli.sys, 'stdout', None), patch.object(cli.sys, 'stderr', None), patch('ctypes.windll', create=True) as windll:
+            cli.say('FetchVolt: Close FetchVolt before uninstalling.', error=True)
+        self.assertEqual(windll.user32.MessageBoxW.call_args.args[3], 0x10)
+
+    def test_terminal_streams_survives_a_missing_console(self):
+        with patch.object(cli.sys, 'stdout', None), patch.object(cli.sys, 'stderr', None), \
+                patch('ctypes.windll', create=True), patch('browser_bridge.native_stream', side_effect=OSError('no pipe')):
+            cli.terminal_streams()
+            self.assertIsNone(cli.sys.stdout)
+
+    def test_uninstall_without_console_reports_through_a_message_box(self):
+        with patch.object(cli.sys, 'stdout', None), patch.object(cli.sys, 'stderr', None), patch.object(cli, 'terminal_streams'), \
+                patch.object(installer, 'uninstall'), patch('ctypes.windll', create=True) as windll:
+            self.assertEqual(cli.main(['--uninstall']), 0)
+        self.assertIn('removed', windll.user32.MessageBoxW.call_args.args[1])
+
+    def test_failed_uninstall_without_console_shows_the_reason(self):
+        error = installer.InstallerError('Close FetchVolt before uninstalling.')
+        with patch.object(cli.sys, 'stdout', None), patch.object(cli.sys, 'stderr', None), patch.object(cli, 'terminal_streams'), \
+                patch.object(installer, 'uninstall', side_effect=error), patch('ctypes.windll', create=True) as windll:
+            self.assertEqual(cli.main(['--uninstall']), 1)
+        self.assertIn('Close FetchVolt', windll.user32.MessageBoxW.call_args.args[1])
+        self.assertEqual(windll.user32.MessageBoxW.call_args.args[3], 0x10)
+
+
 if __name__ == '__main__':
     unittest.main()

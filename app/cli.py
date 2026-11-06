@@ -12,10 +12,22 @@ def terminal_streams():
         return
     ctypes.windll.kernel32.AttachConsole(0xffffffff)
     from browser_bridge import native_stream
-    if sys.stdout is None:
-        sys.stdout = io.TextIOWrapper(native_stream('wb'), encoding='utf-8', write_through=True)
+    try:
+        if sys.stdout is None:
+            sys.stdout = io.TextIOWrapper(native_stream('wb'), encoding='utf-8', write_through=True)
+    except OSError:
+        pass  # No console (for example Settings > Apps > Uninstall): say() shows a message box instead.
     if sys.stderr is None:
         sys.stderr = sys.stdout
+
+
+def say(message, error=False):
+    """Print to the terminal, or show a message box when the exe was started without one."""
+    stream = sys.stderr if error else sys.stdout
+    if stream is not None:
+        print(message, file=stream)
+    else:
+        ctypes.windll.user32.MessageBoxW(None, message, 'FetchVolt', 0x10 if error else 0x40)
 
 
 def manage(argv):
@@ -49,19 +61,19 @@ def manage(argv):
                 import install_wizard
                 return install_wizard.run(layout)
             where = installer.install(layout, accept_license=True, shortcut=not args.no_shortcut, add_path=not args.no_path)
-            print(f'FetchVolt installed in {where}. Open a new terminal to use fetchvolt --help.')
+            say(f'FetchVolt installed in {where}. Open a new terminal to use fetchvolt --help.')
         else:
             from runtime_paths import executable
             installer.uninstall(remove_history=args.remove_history, current_exe=executable())
-            print('FetchVolt was removed for this user.')
+            say('FetchVolt was removed for this user.')
         return 0
     except installer.InstallerError as error:
-        print('FetchVolt: ' + str(error), file=sys.stderr)
+        say('FetchVolt: ' + str(error), error=True)
         return 1
     except OSError as error:
         from diagnostics import failure
         failure('installer-failed', error)
-        print('FetchVolt: Windows refused the change. Check permissions and the local diagnostic log.', file=sys.stderr)
+        say('FetchVolt: Windows refused the change. Check permissions and the local diagnostic log.', error=True)
         return 1
 
 
