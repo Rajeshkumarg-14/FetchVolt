@@ -151,6 +151,55 @@ class LiveLinkTests(unittest.TestCase):
         self.assertTrue(failed_once)
         self.assertEqual(sorted(done), list(range(0, 100, 10)))
 
+    def test_cancel_reaches_single_stream_fallback_when_server_sends_no_validator(self):
+        body = bytes(range(256)) * 8
+        links = engine.LiveLinks({'Wi-Fi': 1})
+        sent = []
+
+        class CancelledMidTransfer(Response):
+            def read1(self, amount=-1):
+                data = super().read1(min(amount, 64) if amount > 0 else 64)
+                sent.append(len(data))
+                if sum(sent) >= 128:
+                    links.cancel()
+                return data
+
+        def request(url, adapter, headers):
+            if 'Range' in headers:  # probe: ranges work but there is no ETag or other validator
+                return io.BytesIO(), Response(206, b'x', **{'Content-Range': f'bytes 0-0/{len(body)}'})
+            return io.BytesIO(), CancelledMidTransfer(200, body, **{'Content-Length': str(len(body))})
+
+        with tempfile.TemporaryDirectory() as folder, patch.object(engine, 'request', side_effect=request), patch.object(engine, 'scan_file'):
+            target = Path(folder) / 'file.bin'
+            with self.assertRaises(engine.DownloadCancelled):
+                engine.download('https://example.test/file.bin', target, {'Wi-Fi': 1}, lambda *_: None, live_links=links)
+            self.assertLess(sum(sent), len(body))
+            self.assertEqual(list(Path(folder).iterdir()), [])
+
+    def test_pause_style_hold_reaches_single_stream_fallback(self):
+        body = bytes(range(256)) * 8
+        links = engine.LiveLinks({'Wi-Fi': 1})
+        links.set_mode('range')
+        seen = []
+
+        class Held(Response):
+            def read1(self, amount=-1):
+                seen.append(1)
+                if len(seen) == 2:
+                    links.hold(True)
+                    links.cancel()
+                return super().read1(64)
+
+        def request(url, adapter, headers):
+            if 'Range' in headers:
+                return io.BytesIO(), Response(206, b'x', **{'Content-Range': f'bytes 0-0/{len(body)}'})
+            return io.BytesIO(), Held(200, body, **{'Content-Length': str(len(body))})
+
+        with tempfile.TemporaryDirectory() as folder, patch.object(engine, 'request', side_effect=request), patch.object(engine, 'scan_file'):
+            with self.assertRaises(engine.DownloadCancelled):
+                engine.download('https://example.test/file.bin', Path(folder) / 'f.bin', {'Wi-Fi': 1}, lambda *_: None, live_links=links)
+            self.assertLess(len(seen), 20)
+
     def test_cancel_stops_a_paused_transfer(self):
         selection = engine.LiveLinks({'Wi-Fi': 1})
         selection.set_mode('range')

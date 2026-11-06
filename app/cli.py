@@ -18,8 +18,39 @@ def terminal_streams():
         sys.stderr = sys.stdout
 
 
+def manage(argv):
+    """--install copies this FetchVolt.exe into place; --uninstall removes the installed copy."""
+    import installer
+    parser = argparse.ArgumentParser(prog='fetchvolt')
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument('--install', action='store_true', help='Install this FetchVolt.exe for the current user.')
+    action.add_argument('--uninstall', action='store_true', help='Remove the installed FetchVolt for the current user.')
+    parser.add_argument('--remove-history', action='store_true', help='With --uninstall, also delete speed history.')
+    args = parser.parse_args(argv)
+    if args.remove_history and not args.uninstall:
+        parser.error('--remove-history requires --uninstall')
+    try:
+        if args.install:
+            print(f'FetchVolt installed in {installer.install()}. Open a new terminal to use fetchvolt --help.')
+        else:
+            from runtime_paths import executable
+            installer.uninstall(remove_history=args.remove_history, current_exe=executable())
+            print('FetchVolt was removed for this user.')
+        return 0
+    except installer.InstallerError as error:
+        print('FetchVolt: ' + str(error), file=sys.stderr)
+        return 1
+    except OSError as error:
+        from diagnostics import failure
+        failure('installer-failed', error)
+        print('FetchVolt: Windows refused the change. Check permissions and the local diagnostic log.', file=sys.stderr)
+        return 1
+
+
 def main(argv=None):
     terminal_streams()
+    if argv and argv[0] in ('--install', '--uninstall'):
+        return manage(argv)
     parser = argparse.ArgumentParser(prog='fetchvolt', description='FetchVolt desktop and verified updates.')
     parser.add_argument('--version', action='version', version='FetchVolt ' + VERSION)
     commands = parser.add_subparsers(dest='command', required=True)

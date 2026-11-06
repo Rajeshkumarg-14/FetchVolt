@@ -489,7 +489,7 @@ def _download(url, destination, links, report, *, public_only=False, overwrite=T
         if size == 0 or not re.fullmatch(r'"[\x21\x23-\x7e\x80-\xff]*"', etag):
             if live_links:
                 live_links.set_mode('single', {primary: links[primary]})
-            _, transferred = _download(url, destination, {primary: links[primary]}, report, ranged=False, **options)
+            _, transferred = _download(url, destination, {primary: links[primary]}, report, live_links=live_links, ranged=False, **options)
             return time.monotonic() - started, totals | transferred
 
         range_size = record.data['chunk'] if record else CHUNK * 2 if live_links else CHUNK
