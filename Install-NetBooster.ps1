@@ -18,7 +18,7 @@ $legacyShortcuts = @(
 $registry = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NetBooster'
 $powerShell = Join-Path $PSHOME 'pwsh.exe'
 $payload = [ordered]@{
-    'FetchVolt.exe' = 'D25680DC165961D280976B94F59BDDA4597724D6E80AA270141390285EE87F3F'
+    'FetchVolt.exe' = '6E7C3EFC2E0BD054A86264FBE5F739D47F867A9F37576FF7CE907B0165929F42'
     'Uninstall-NetBooster.ps1' = '6BC2BAD9429656423464856A88D37F08DAB7CEA500FC95B6912D0301765454CE'
 }
 
