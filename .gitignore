@@ -10,3 +10,7 @@ releases/
 *.dpapi
 *.pfx
 *.key
+
+/docs/PUBLISHING-LOCAL.md
+/AGENTS.md
+/CLAUDE.md
