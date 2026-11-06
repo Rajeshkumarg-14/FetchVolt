@@ -19,19 +19,37 @@ def terminal_streams():
 
 
 def manage(argv):
-    """--install copies this FetchVolt.exe into place; --uninstall removes the installed copy."""
+    """--install opens the setup wizard (or installs silently); --uninstall removes the installed copy."""
     import installer
     parser = argparse.ArgumentParser(prog='fetchvolt')
     action = parser.add_mutually_exclusive_group(required=True)
-    action.add_argument('--install', action='store_true', help='Install this FetchVolt.exe for the current user.')
+    action.add_argument('--install', action='store_true', help='Install this FetchVolt.exe for the current user (opens the setup wizard).')
     action.add_argument('--uninstall', action='store_true', help='Remove the installed FetchVolt for the current user.')
+    parser.add_argument('--silent', action='store_true', help='With --install, skip the wizard (requires --accept-license).')
+    parser.add_argument('--accept-license', action='store_true', help='With --silent, confirm you accept the LICENSE terms.')
+    parser.add_argument('--dir', help='With --install, the install folder (default: the Programs folder in your local app data).')
+    parser.add_argument('--no-shortcut', action='store_true', help='With --silent, do not create a Start menu shortcut.')
+    parser.add_argument('--no-path', action='store_true', help='With --silent, do not add fetchvolt to PATH.')
     parser.add_argument('--remove-history', action='store_true', help='With --uninstall, also delete speed history.')
     args = parser.parse_args(argv)
     if args.remove_history and not args.uninstall:
         parser.error('--remove-history requires --uninstall')
+    if args.uninstall and (args.silent or args.accept_license or args.dir or args.no_shortcut or args.no_path):
+        parser.error('--silent, --accept-license, --dir, --no-shortcut and --no-path require --install')
+    if (args.accept_license or args.no_shortcut or args.no_path) and not args.silent:
+        parser.error('--accept-license, --no-shortcut and --no-path require --silent')
+    if args.silent and not args.accept_license:
+        parser.error('--silent requires --accept-license to confirm you accept the LICENSE terms')
     try:
         if args.install:
-            print(f'FetchVolt installed in {installer.install()}. Open a new terminal to use fetchvolt --help.')
+            layout = installer.Layout()
+            if args.dir:
+                layout = layout.at(installer.validate_directory(args.dir))
+            if not args.silent:
+                import install_wizard
+                return install_wizard.run(layout)
+            where = installer.install(layout, accept_license=True, shortcut=not args.no_shortcut, add_path=not args.no_path)
+            print(f'FetchVolt installed in {where}. Open a new terminal to use fetchvolt --help.')
         else:
             from runtime_paths import executable
             installer.uninstall(remove_history=args.remove_history, current_exe=executable())

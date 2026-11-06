@@ -4,6 +4,7 @@ Same locations and registry entries as Install-NetBooster.ps1, so both can manag
 Every path and registry key is injected through Layout so tests never touch the real user profile.
 """
 import ctypes
+import datetime
 import os
 from pathlib import Path
 import shutil
@@ -19,9 +20,10 @@ PROCESS_NAMES = {'net booster.exe', 'portweave.exe', 'portflock.exe', 'fetchvolt
 LAUNCHER_HEADER = '@rem FetchVolt managed terminal launcher'
 LAUNCHER = LAUNCHER_HEADER + r'''
 @echo off
+set "FV_DIR=%~dp0"
 "%~dp0Net Booster.exe" %*
 if not "%errorlevel%"=="42" exit /b %errorlevel%
-"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "$p=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Programs\Net Booster\.update-result.json';for($i=0;$i -lt 120;$i++){try{$r=Get-Content -LiteralPath $p -Raw|ConvertFrom-Json;if($r.state -ne 'pending'){Write-Host $r.message;exit [int]$r.exitCode}}catch{};Start-Sleep -Seconds 1};Write-Error 'Update result timed out; check the installation before retrying.';exit 1"
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Command "$p=Join-Path $env:FV_DIR '.update-result.json';for($i=0;$i -lt 120;$i++){try{$r=Get-Content -LiteralPath $p -Raw|ConvertFrom-Json;if($r.state -ne 'pending'){Write-Host $r.message;exit [int]$r.exitCode}}catch{};Start-Sleep -Seconds 1};Write-Error 'Update result timed out; check the installation before retrying.';exit 1"
 exit /b %errorlevel%
 '''.replace('\n', '\r\n')
 SHORTCUT_SCRIPT = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:FV_LINK);$s.TargetPath=$env:FV_TARGET;"
@@ -34,15 +36,62 @@ class InstallerError(Exception):
 
 class Layout:
     def __init__(self, local=None, programs=None, uninstall_key=r'Software\Microsoft\Windows\CurrentVersion\Uninstall\NetBooster',
-                 environment_key='Environment', run_key=r'Software\Microsoft\Windows\CurrentVersion\Run', broadcast=True):
+                 environment_key='Environment', run_key=r'Software\Microsoft\Windows\CurrentVersion\Run', broadcast=True, install=None):
         local = Path(local or os.environ['LOCALAPPDATA'])
-        self.install = local / 'Programs' / 'Net Booster'
+        self.default_install = local / 'Programs' / 'Net Booster'
+        self.install = Path(install) if install else self.default_install
         self.data = local / 'Net Booster'
         self.programs = Path(programs or Path(os.environ['APPDATA']) / 'Microsoft/Windows/Start Menu/Programs')
         self.exe = self.install / 'Net Booster.exe'
         self.launcher = self.install / 'fetchvolt.cmd'
         self.shortcut = self.programs / 'FetchVolt.lnk'
         self.uninstall_key, self.environment_key, self.run_key, self.broadcast = uninstall_key, environment_key, run_key, broadcast
+        self._kwargs = dict(local=local, programs=self.programs, uninstall_key=uninstall_key, environment_key=environment_key,
+                            run_key=run_key, broadcast=broadcast)
+
+    def at(self, install):
+        """The same layout with a different install folder."""
+        return Layout(**self._kwargs, install=install)
+
+    @property
+    def is_default(self):
+        return os.path.normcase(str(self.install)) == os.path.normcase(str(self.default_install))
+
+    def installed(self):
+        """The layout recorded by a previous install, so uninstall removes the folder that was really used."""
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.uninstall_key) as key:
+                recorded = winreg.QueryValueEx(key, 'InstallLocation')[0]
+        except FileNotFoundError:
+            return self
+        return self.at(recorded) if recorded and Path(recorded).is_absolute() else self
+
+
+def validate_directory(path):
+    """Return a safe install folder, or raise a message the wizard can show as is."""
+    text = str(path).strip().strip('"')
+    if not text:
+        raise InstallerError('Choose an install folder.')
+    folder = Path(text)
+    if not folder.is_absolute() or text.startswith('\\\\'):
+        raise InstallerError('Choose a folder on a local drive, for example C:\\Users\\you\\FetchVolt.')
+    if folder.parent == folder:
+        raise InstallerError('Choose a folder, not a whole drive.')
+    plain(folder)
+    if folder.exists():
+        if not folder.is_dir():
+            raise InstallerError('That path is a file. Choose a folder.')
+        entries = {entry.name.lower() for entry in folder.iterdir()}
+        if entries and 'net booster.exe' not in entries:
+            raise InstallerError('That folder already contains other files. Choose an empty or new folder.')
+    else:
+        # Missing intermediate folders are fine (install() creates them) if a real drive or folder sits above them.
+        ancestor = folder.parent
+        while not ancestor.exists() and ancestor.parent != ancestor:
+            ancestor = ancestor.parent
+        if not ancestor.is_dir():
+            raise InstallerError('That drive or folder is not available.')
+    return folder
 
 
 def plain(path):
@@ -108,7 +157,22 @@ def create_shortcut(layout):
         raise InstallerError('Could not create the Start menu shortcut.')
 
 
-def install(layout=None, source=None):
+def license_text():
+    from runtime_paths import resource_root
+    return (resource_root() / 'LICENSE').read_text('utf-8')
+
+
+def copy_notices(layout):
+    from runtime_paths import resource_root
+    for name in ('LICENSE', 'LICENSING.md', 'NOTICE.md'):
+        source = resource_root() / name
+        if source.is_file():
+            shutil.copyfile(source, layout.install / name)
+
+
+def install(layout=None, source=None, *, accept_license=False, shortcut=True, add_path=True):
+    if not accept_license:
+        raise InstallerError('Accept the license terms to install FetchVolt.')
     layout = layout or Layout()
     if source is None:
         from runtime_paths import executable, is_packaged
@@ -123,7 +187,8 @@ def install(layout=None, source=None):
     if running_copies(layout):
         raise InstallerError('Close the installed copy of FetchVolt before updating it.')
     layout.install.mkdir(parents=True, exist_ok=True)
-    layout.programs.mkdir(parents=True, exist_ok=True)
+    if shortcut:
+        layout.programs.mkdir(parents=True, exist_ok=True)
     staged = layout.install / f'.NetBooster-{uuid.uuid4().hex}.tmp'
     try:
         shutil.copyfile(source, staged)
@@ -133,13 +198,17 @@ def install(layout=None, source=None):
     finally:
         staged.unlink(missing_ok=True)
     layout.launcher.write_bytes(LAUNCHER.encode('ascii'))
-    create_shortcut(layout)
+    copy_notices(layout)
+    if shortcut:
+        create_shortcut(layout)
     with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, layout.uninstall_key, 0, winreg.KEY_SET_VALUE) as key:
         for name, value in {'DisplayName': 'FetchVolt', 'InstallLocation': str(layout.install), 'DisplayIcon': str(layout.exe),
                             'UninstallString': f'"{layout.exe}" --uninstall', 'CliPath': str(layout.install),
-                            'DisplayVersion': VERSION}.items():
+                            'DisplayVersion': VERSION,
+                            'LicenseAccepted': f'PolyForm Noncommercial 1.0.0; FetchVolt {VERSION}; {datetime.date.today().isoformat()}'}.items():
             winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
-    add_to_path(layout)
+    if add_path:
+        add_to_path(layout)
     return layout.install
 
 
@@ -152,7 +221,7 @@ def _delete_later(layout):
 
 
 def uninstall(layout=None, remove_history=False, current_exe=None):
-    layout = layout or Layout()
+    layout = (layout or Layout()).installed()
     for path in (layout.exe, layout.launcher, layout.shortcut, layout.install):
         plain(path)
     if running_copies(layout) or remove_history and any(

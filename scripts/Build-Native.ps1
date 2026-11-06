@@ -11,6 +11,7 @@ try {
     npm run build --prefix ui
     if ($LASTEXITCODE) { throw 'Frontend build failed.' }
     $data = @('--include-data-files=ui/dist/index.html=ui/dist/index.html','--include-data-files=scripts/Apply-Update.ps1=scripts/Apply-Update.ps1')
+    foreach ($name in @('LICENSE','LICENSING.md','NOTICE.md')) { $data += "--include-data-files=${name}=${name}" }
     foreach ($name in @('manifest.json','background.js','policy.js','popup.html','popup.js','popup.css','icon.png')) {
         $data += "--include-data-files=extension/${name}=extension/${name}"
     }
