@@ -30,6 +30,20 @@ Use the **Uninstall** action under Installed apps, or run the matching script in
 
 Both scripts honor the active PowerShell execution policy. This local build and its scripts are unsigned. Where policy requires a trusted publisher signature, use an organization-approved signed release. The embedded hashes detect changed payloads when the installer itself comes from a trusted copy.
 
+### Install with the setup wizard
+
+`FetchVolt.exe` can also install itself, with no PowerShell 7 needed. Run `FetchVolt.exe --install` to open the setup wizard: you read and accept the license, choose the install folder, and choose whether to add a Start menu shortcut and the `fetchvolt` command to your PATH. Everything is per user and needs no administrator rights. `FetchVolt.exe --uninstall` (also used by Installed apps) removes the installed copy, PATH entry, shortcut and registrations. Add `--remove-history` to also delete the speed history.
+
+For scripts, `--install --silent --accept-license` installs without the wizard. Passing `--accept-license` records that you accept the license terms. Other options are `--dir <folder>`, `--no-shortcut` and `--no-path`.
+
+Limits to know about:
+
+- The default folder is **%LOCALAPPDATA%\Programs\Net Booster**. In a **custom folder**, FetchVolt works normally but `fetchvolt update` is unavailable, because signed updates are only applied to the default folder. To update a custom install, run the new `FetchVolt.exe --install` again.
+- The install folder must be new, empty or an existing FetchVolt folder. Network paths, drive roots and folders holding other files are refused.
+- Uninstall and reinstall refuse while the installed copy is running. Close it first.
+- Windows may warn about an unsigned executable until releases are code-signed.
+- Uninstalling removes the browser-link registration. Extensions you loaded by hand must be removed in the browser.
+
 ## Download a file
 
 1. Connect the networks you want to use. Wi-Fi, Ethernet, Bluetooth PAN and up to four USB-tethered phones can be selected together for one file. Each phone needs its own active Windows adapter. For Bluetooth tethering, pair a phone with Windows and join its Personal Area Network (PAN). For USB tethering, connect a phone with a data-capable cable and enable USB tethering or Personal Hotspot. An iPhone requires Apple Devices or iTunes on Windows.
