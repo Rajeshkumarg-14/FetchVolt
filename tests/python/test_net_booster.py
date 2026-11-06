@@ -80,6 +80,7 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual(self.reports[-1], (totals, len(self.payload)))
         self.assertEqual(self.target.read_bytes(), self.payload)
 
+    @patch.object(app, 'STREAMS_PER_LINK', 1)
     def test_four_adapters_contribute_to_one_file(self):
         links = {'Wi-Fi': 13, 'LAN': 17, 'Bluetooth': 21, 'USB': 25}
         first = set()
@@ -100,6 +101,7 @@ class DownloadTests(unittest.TestCase):
         self.assertEqual(set(totals), set(links))
         self.assertEqual(self.target.read_bytes(), self.payload)
 
+    @patch.object(app, 'STREAMS_PER_LINK', 1)
     def test_multiple_failed_adapters_leave_intact_file(self):
         links = {'Wi-Fi': 13, 'LAN': 17, 'Bluetooth': 21, 'USB': 25}
         ready = threading.Barrier(4)
@@ -119,6 +121,62 @@ class DownloadTests(unittest.TestCase):
 
         _, totals = self.fetch(request, links)
         self.assertEqual(totals, dict.fromkeys(links, 0) | {'USB': len(self.payload)})
+        self.assertEqual(self.target.read_bytes(), self.payload)
+
+    def test_one_adapter_streams_ranges_in_parallel_and_file_is_intact(self):
+        active = peak = 0
+        lock = threading.Lock()
+
+        def request(url, adapter, headers):
+            nonlocal active, peak
+            if 'If-Range' in headers:
+                with lock:
+                    active += 1
+                    peak = max(peak, active)
+                threading.Event().wait(.03)
+                with lock:
+                    active -= 1
+            return self.ranged(headers)
+
+        _, totals = self.fetch(request, {'USB': 25})
+        self.assertEqual(peak, app.STREAMS_PER_LINK)
+        self.assertEqual(totals, {'USB': len(self.payload)})
+        self.assertEqual(self.target.read_bytes(), self.payload)
+
+    def test_every_stream_stays_bound_to_its_own_adapter(self):
+        links = {'Wi-Fi': 13, 'USB': 25}
+        seen = set()
+
+        def request(url, adapter, headers):
+            seen.add(adapter)
+            return self.ranged(headers)
+
+        self.fetch(request, links)
+        self.assertLessEqual(seen, set(links.values()))
+        self.assertEqual(self.target.read_bytes(), self.payload)
+
+    def test_failed_stream_retries_on_surviving_adapter_with_intact_file(self):
+        links = {'Wi-Fi': 13, 'USB': 25}
+
+        def request(url, adapter, headers):
+            if 'If-Range' in headers and adapter == 13:
+                raise ConnectionError('Adapter disconnected')
+            return self.ranged(headers)
+
+        _, totals = self.fetch(request, links)
+        self.assertEqual(totals.get('Wi-Fi', 0), 0)
+        self.assertEqual(totals['USB'], len(self.payload))
+        self.assertEqual(self.target.read_bytes(), self.payload)
+
+    def test_lone_adapter_falls_back_to_one_stream_when_server_ignores_range(self):
+        _, totals = self.fetch(lambda url, adapter, headers: self.full(), {'USB': 25})
+        self.assertEqual(totals, {'USB': len(self.payload)})
+        self.assertEqual(self.target.read_bytes(), self.payload)
+
+    def test_single_stream_setting_still_works(self):
+        with patch.object(app, 'STREAMS_PER_LINK', 1):
+            _, totals = self.fetch(lambda url, adapter, headers: self.ranged(headers))
+        self.assertEqual(sum(totals.values()), len(self.payload))
         self.assertEqual(self.target.read_bytes(), self.payload)
 
     def test_all_adapter_failures_preserve_existing_destination(self):

@@ -85,6 +85,7 @@ class TransferMatrix(unittest.TestCase):
                 self.assertLessEqual(touched, set(links.values()))
             self.assertEqual(list(target.parent.iterdir()), [target])
 
+    @patch.object(app, 'STREAMS_PER_LINK', 1)
     def test_seven_adapters_each_receive_bytes(self):
         links = {name: i + 1 for i, name in enumerate(ADAPTERS)}
         first = set()

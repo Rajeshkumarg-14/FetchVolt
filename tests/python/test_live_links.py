@@ -10,6 +10,7 @@ from tests.python.test_net_booster import Response
 
 
 class LiveLinkTests(unittest.TestCase):
+    @patch.object(engine, 'STREAMS_PER_LINK', 1)
     def test_adapter_can_join_without_redownloading_completed_ranges(self):
         body = bytes(range(128))
         started = threading.Event()
@@ -86,6 +87,7 @@ class LiveLinkTests(unittest.TestCase):
             future.result(timeout=3)
         self.assertEqual(complete, [0, 10, 20])
 
+    @patch.object(engine, 'STREAMS_PER_LINK', 1)
     def test_connection_recovers_without_repeating_completed_ranges(self):
         selection = engine.LiveLinks({'Wi-Fi': 1})
         selection.set_mode('range')
@@ -98,6 +100,56 @@ class LiveLinkTests(unittest.TestCase):
             engine.run_live_ranges(selection, iter([0, 10, 20]), fetch)
         self.assertEqual(attempts, [0, 10, 10, 20])
 
+    def test_each_adapter_runs_several_streams_at_once(self):
+        selection = engine.LiveLinks({'USB': 1})
+        selection.set_mode('range')
+        active = peak = 0
+        lock = threading.Lock()
+        def fetch(name, offset, adapter):
+            nonlocal active, peak
+            with lock:
+                active += 1
+                peak = max(peak, active)
+            threading.Event().wait(.05)
+            with lock:
+                active -= 1
+        engine.run_live_ranges(selection, iter(range(0, 160, 10)), fetch)
+        self.assertEqual(peak, engine.STREAMS_PER_LINK)
+
+    def test_streams_are_capped_per_adapter_and_cover_every_range_once(self):
+        selection = engine.LiveLinks({'Wi-Fi': 1, 'USB': 2})
+        selection.set_mode('range')
+        active = {'Wi-Fi': 0, 'USB': 0}
+        peak = dict(active)
+        done = []
+        lock = threading.Lock()
+        def fetch(name, offset, adapter):
+            with lock:
+                active[name] += 1
+                peak[name] = max(peak[name], active[name])
+            threading.Event().wait(.03)
+            with lock:
+                active[name] -= 1
+                done.append(offset)
+        engine.run_live_ranges(selection, iter(range(0, 400, 10)), fetch)
+        self.assertEqual(sorted(done), list(range(0, 400, 10)))
+        self.assertEqual(peak, {'Wi-Fi': engine.STREAMS_PER_LINK, 'USB': engine.STREAMS_PER_LINK})
+
+    def test_failed_stream_range_is_retried_not_lost(self):
+        selection = engine.LiveLinks({'Wi-Fi': 1, 'USB': 2})
+        selection.set_mode('range')
+        done = []
+        failed_once = []
+        def fetch(name, offset, adapter):
+            if name == 'Wi-Fi':
+                failed_once.append(offset)
+                raise ConnectionError('Connection dropped.')
+            done.append(offset)
+        with patch.object(selection, 'wait'):
+            engine.run_live_ranges(selection, iter(range(0, 100, 10)), fetch)
+        self.assertTrue(failed_once)
+        self.assertEqual(sorted(done), list(range(0, 100, 10)))
+
     def test_cancel_stops_a_paused_transfer(self):
         selection = engine.LiveLinks({'Wi-Fi': 1})
         selection.set_mode('range')
@@ -106,6 +158,7 @@ class LiveLinkTests(unittest.TestCase):
         with self.assertRaises(engine.DownloadCancelled):
             engine.run_live_ranges(selection, iter([0]), lambda *_: None)
 
+    @patch.object(engine, 'STREAMS_PER_LINK', 1)
     def test_partial_range_is_retried_without_losing_completed_bytes(self):
         body = bytes(range(128))
         control = engine.LiveLinks({'Wi-Fi': 1})

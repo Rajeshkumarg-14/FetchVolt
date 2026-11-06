@@ -31,6 +31,7 @@ from urllib.parse import quote, unquote, urljoin, urlsplit
 CHUNK = 2 * 1024 * 1024
 READ_BUFFER = 64 * 1024
 MAX_CONNECTIONS = 7
+STREAMS_PER_LINK = 4  # one TCP stream cannot fill a fast, high-latency link (cellular/USB tether)
 MAX_FILE_SIZE = 128 * 1024 ** 3
 HEADER_TIMEOUT = 30
 RANGE_TIMEOUT = 120
@@ -342,7 +343,7 @@ def run_live_ranges(selection, offsets, fetch):
     failed = set()
     revision = -1
     exhausted = False
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONNECTIONS,
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONNECTIONS * STREAMS_PER_LINK,
                                                 thread_name_prefix='live-range') as pool:
         while True:
             status = selection.status()
@@ -369,16 +370,20 @@ def run_live_ranges(selection, offsets, fetch):
             if current_revision != revision:
                 failed.clear()
                 revision = current_revision
-            busy = {item[0] for item in pending.values()}
             for name, adapter in links.items():
-                if len(pending) >= MAX_CONNECTIONS or name in busy or (name, adapter) in failed:
+                if (name, adapter) in failed:
                     continue
-                offset = retry.popleft() if retry else next(offsets, None)
-                if offset is None:
-                    exhausted = True
+                active = sum(item[0] == name for item in pending.values())
+                while active < STREAMS_PER_LINK:
+                    offset = retry.popleft() if retry else next(offsets, None)
+                    if offset is None:
+                        exhausted = True
+                        break
+                    future = pool.submit(fetch, name, offset, adapter)
+                    pending[future] = name, adapter, offset
+                    active += 1
+                if exhausted:
                     break
-                future = pool.submit(fetch, name, offset, adapter)
-                pending[future] = name, adapter, offset
             if not pending:
                 if exhausted and not retry:
                     return
@@ -398,7 +403,7 @@ def download(url, destination, links, report, **options):
     return _download(url, destination, links, report, **options)
 
 
-def _download(url, destination, links, report, *, public_only=False, overwrite=True, expected_sha256=None, live_links=None, recovery_id=None):
+def _download(url, destination, links, report, *, public_only=False, overwrite=True, expected_sha256=None, live_links=None, recovery_id=None, ranged=True):
     options = dict(public_only=public_only, overwrite=overwrite, expected_sha256=expected_sha256)
     fetch_response = bind(request, public_only=True) if public_only else request
     if not 1 <= len(links) <= MAX_CONNECTIONS:
@@ -423,7 +428,7 @@ def _download(url, destination, links, report, *, public_only=False, overwrite=T
             live_links.wait_ready()
         primary = next(iter(links))
         try:
-            probe = {'Range': 'bytes=0-0'} if len(links) > 1 or live_links or record else {}
+            probe = {'Range': 'bytes=0-0'} if ranged else {}
             conn, response = fetch_response(url, links[primary], probe)
         except (OSError, http.client.HTTPException):
             if len(links) == 1:
@@ -484,7 +489,7 @@ def _download(url, destination, links, report, *, public_only=False, overwrite=T
         if size == 0 or not re.fullmatch(r'"[\x21\x23-\x7e\x80-\xff]*"', etag):
             if live_links:
                 live_links.set_mode('single', {primary: links[primary]})
-            _, transferred = _download(url, destination, {primary: links[primary]}, report, **options)
+            _, transferred = _download(url, destination, {primary: links[primary]}, report, ranged=False, **options)
             return time.monotonic() - started, totals | transferred
 
         range_size = record.data['chunk'] if record else CHUNK * 2 if live_links else CHUNK
@@ -596,8 +601,8 @@ def _download(url, destination, links, report, *, public_only=False, overwrite=T
                         aborted.set()
                         raise
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(links), thread_name_prefix=threading.current_thread().name + '-range') as pool:
-                futures = [pool.submit(worker, name) for name in links]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(links) * STREAMS_PER_LINK, thread_name_prefix=threading.current_thread().name + '-range') as pool:
+                futures = [pool.submit(worker, name) for name in links for _ in range(STREAMS_PER_LINK)]
                 for future in futures:
                     future.result()
             failed_chunks = []
