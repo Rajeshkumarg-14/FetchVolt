@@ -18,7 +18,7 @@ $legacyShortcuts = @(
 $registry = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\NetBooster'
 $powerShell = Join-Path $PSHOME 'pwsh.exe'
 $payload = [ordered]@{
-    'FetchVolt.exe' = '6365139EF735CA1FD2A5C07C95E0A6D6C1AD29BA488B7EBFEA12C8218B114C65'
+    'FetchVolt.exe' = 'D25680DC165961D280976B94F59BDDA4597724D6E80AA270141390285EE87F3F'
     'Uninstall-NetBooster.ps1' = '6BC2BAD9429656423464856A88D37F08DAB7CEA500FC95B6912D0301765454CE'
 }
 
@@ -114,7 +114,7 @@ try {
 } finally {$environmentKey.Dispose()}
 $env:Path += ';'+$install
 $null=New-ItemProperty -LiteralPath $registry -Name CliPath -Value $install -PropertyType String -Force
-$null=New-ItemProperty -LiteralPath $registry -Name DisplayVersion -Value '2.6.0' -PropertyType String -Force
+$null=New-ItemProperty -LiteralPath $registry -Name DisplayVersion -Value '2.6.1' -PropertyType String -Force
 Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class FetchVoltEnvironment { [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern IntPtr SendMessageTimeout(IntPtr h,uint m,UIntPtr w,string l,uint f,uint t,out UIntPtr r); }'
 [UIntPtr]$broadcastResult=[UIntPtr]::Zero
 $null=[FetchVoltEnvironment]::SendMessageTimeout([IntPtr]0xffff,0x1a,[UIntPtr]::Zero,'Environment',2,1000,[ref]$broadcastResult)

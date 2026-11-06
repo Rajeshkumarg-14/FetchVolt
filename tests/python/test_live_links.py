@@ -65,6 +65,7 @@ class LiveLinkTests(unittest.TestCase):
         self.assertFalse(links.update({'USB': 2}))
         self.assertEqual(links.snapshot()[2], {'Wi-Fi': 1})
 
+    @patch.object(engine, 'STREAMS_PER_LINK', 1)
     def test_pause_and_resume_retain_completed_ranges(self):
         selection = engine.LiveLinks({'Wi-Fi': 1})
         selection.set_mode('range')

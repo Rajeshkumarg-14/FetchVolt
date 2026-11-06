@@ -14,7 +14,7 @@ import sysconfig
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '2.6.0'
+VERSION = '2.6.1'
 RUNTIME_PACKAGES = (
     'Nuitka', 'pywebview', 'psutil', 'mcp', 'pythonnet', 'clr_loader', 'cffi', 'pycparser', 'bottle',
     'proxy_tools', 'typing_extensions', 'anyio', 'pydantic', 'pydantic_core', 'annotated_types',
