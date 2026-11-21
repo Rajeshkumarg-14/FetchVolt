@@ -6,6 +6,8 @@
 
 FetchVolt is a Windows 11 desktop downloader and network monitor. Open **FetchVolt.exe** to use it. Build the executable from the source in this repository using the instructions below. The native build bundles its runtime and the React interface. It uses Microsoft Edge WebView2 Runtime, which must be available on Windows.
 
+[How FetchVolt verifies resumed downloads](https://www.rajeshkumarg.com/work/fetchvolt) explains how adapter selection and chunk verification work together.
+
 ## License
 
 FetchVolt is source-available under [PolyForm Noncommercial 1.0.0](LICENSE). You may fork, improve and redistribute it for permitted purposes, with license and required notices preserved. Commercial use is restricted, with the standard license's explicit organizational exceptions. This is not an OSI-approved open-source license. See [LICENSING.md](LICENSING.md) and [CONTRIBUTING.md](CONTRIBUTING.md); third-party components retain their own terms.
